@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Weather layer</title>
+  <style>
+    html, body{
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    #map-canvas {
+      width: 40%;
+      height: 40%;
+    }
+    .gm-style-iw {
+      text-align: center;
+    }
+  </style>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js" type="text/javascript"></script>
+  <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA2SEGI2CXTDqgPg3goUzDJX6Zj8qmXOLo"></script>
+<script>
+  var map;
+  var geoJSON;
+  var request;
+  var gettingData = false;
+  var openWeatherMapKey = "f7be118642debd8e204cda2180e47fca";
+  //get the lat and lon data from open weather web API
+  var yourLat =41.0076;
+  var yourLon =-91.9637;
+
+  function initialize() {
+    var mapOptions = {
+      zoom: 4,
+	  //set the lat and lon by yourself
+      center: new google.maps.LatLng(yourLat,yourLon),
+	    zoom: 9
+    };
+
+    map = new google.maps.Map(document.getElementById('map-canvas'),
+        mapOptions);
+    // Add interaction listeners to make weather requests
+    google.maps.event.addListener(map, 'idle', checkIfDataRequested);
+
+    // Sets up and populates the info window with details
+    map.data.addListener('click', function(event) {
+      infowindow.setContent(
+       "<img src=" + event.feature.getProperty("icon") + ">"
+       + "<br /><strong>" + event.feature.getProperty("city") + "</strong>"
+       + "<br />" + event.feature.getProperty("temperature") + "&deg;C"
+       + "<br />" + event.feature.getProperty("weather")
+       );
+      infowindow.setOptions({
+          position:{
+            lat: event.latLng.lat(),
+            lng: event.latLng.lng()
+          },
+          pixelOffset: {
+            width: 0,
+            height: -15
+          }
+        });
+      infowindow.open(map);
+    });
+  }
+
+  var checkIfDataRequested = function() {
+    // Stop extra requests being sent
+    while (gettingData === true) {
+      request.abort();
+      gettingData = false;
+    }
+    getCoords();
+  };
+
+  // Get the coordinates from the Map bounds
+  var getCoords = function() {
+    var bounds = map.getBounds();
+    var NE = bounds.getNorthEast();
+    var SW = bounds.getSouthWest();
+    getWeather(NE.lat(), NE.lng(), SW.lat(), SW.lng());
+  };
+
+  // Make the weather request
+  var getWeather = function(northLat, eastLng, southLat, westLng) {
+    gettingData = true;
+    var requestString = "http://api.openweathermap.org/data/2.5/box/city?bbox="
+                        + westLng + "," + northLat + "," //left top
+                        + eastLng + "," + southLat + "," //right bottom
+                        + map.getZoom()
+                        + "&cluster=yes&format=json"
+                        + "&APPID=" + openWeatherMapKey;
+    request = new XMLHttpRequest();
+    request.onload = proccessResults;
+    request.open("get", requestString, true);
+    request.send();
+  };
+
+  // Take the JSON results and proccess them
+  var proccessResults = function() {
+    console.log(this);
+    var results = JSON.parse(this.responseText);
+    if (results.list.length > 0) {
+        resetData();
+        for (var i = 0; i < results.list.length; i++) {
+          geoJSON.features.push(jsonToGeoJson(results.list[i]));
+        }
+        drawIcons(geoJSON);
+    }
+  };
+
+  var infowindow = new google.maps.InfoWindow();
+
+  // For each result that comes back, convert the data to geoJSON
+  var jsonToGeoJson = function (weatherItem) {
+    var feature = {
+      type: "Feature",
+      properties: {
+        city: weatherItem.name,
+        weather: weatherItem.weather[0].main,
+        temperature: weatherItem.main.temp,
+        min: weatherItem.main.temp_min,
+        max: weatherItem.main.temp_max,
+        humidity: weatherItem.main.humidity,
+        pressure: weatherItem.main.pressure,
+        windSpeed: weatherItem.wind.speed,
+        windDegrees: weatherItem.wind.deg,
+        windGust: weatherItem.wind.gust,
+        icon: "http://openweathermap.org/img/w/"
+              + weatherItem.weather[0].icon  + ".png",
+        coordinates: [weatherItem.coord.lon, weatherItem.coord.lat]
+      },
+      geometry: {
+        type: "Point",
+        coordinates: [weatherItem.coord.lon, weatherItem.coord.lat]
+      }
+    };
+    // Set the custom marker icon
+    map.data.setStyle(function(feature) {
+      return {
+        icon: {
+          url: feature.getProperty('icon'),
+          anchor: new google.maps.Point(25, 25)
+        }
+      };
+    });
+
+    // returns object
+    return feature;
+  };
+
+  // Add the markers to the map
+  var drawIcons = function (weather) {
+     map.data.addGeoJson(geoJSON);
+     // Set the flag to finished
+     gettingData = false;
+  };
+
+  // Clear data layer and geoJSON
+  var resetData = function () {
+    geoJSON = {
+      type: "FeatureCollection",
+      features: []
+    };
+    map.data.forEach(function(feature) {
+      map.data.remove(feature);
+    });
+  };
+
+  google.maps.event.addDomListener(window, 'load', initialize);
+
+
+
+  var locationLat;
+  var locationLon;
+  var urlForCurrentWeather = "http://api.openweathermap.org/data/2.5/weather";
+  var urlForForeCast = "http://api.openweathermap.org/data/2.5/forecast";
+  var currentUrl;
+  function CityQueryData(city){
+    this.q = city;
+    this.mode = "json";
+    this.appid = "f7be118642debd8e204cda2180e47fca";
+  }
+  function ZipCodeQueryData(zipCode){
+    this.zip = zipCode;
+    this.mode = "json";
+    this.appid = "f7be118642debd8e204cda2180e47fca";
+  }
+  function LatLonQueryData(lat, lon){
+    this.lat = lat;
+    this.lon = lon;
+    this.mode = "json";
+    this.appid = "f7be118642debd8e204cda2180e47fca";
+  }
+  function getParameterByName(name, url) {
+    if (!url) {
+      url = window.location.href;
+    }
+    name = name.replace(/[\[\]]/g, "\\$&");
+    var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+        results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2].replace(/\+/g, " "));
+  }
+  //type 1 is current weather
+  //other is forecase weather
+  function setWeatherQueryData(){
+    var city = getParameterByName("city");
+    var zipCode = getParameterByName("zip");
+    if(zipCode!==null && zipCode!==''){
+      return new ZipCodeQueryData(zipCode);
+    }
+    if (city!==null && city!==''){
+      return new CityQueryData(city);
+    }
+    return null;
+  }
+
+  function fail(msg){
+    alert("get position failed");
+    alert(msg.code+msg.message);
+  }
+
+
+  function showCurrentWeather(){
+    var queryData = setWeatherQueryData();
+    if(queryData===null){
+      alert("query data loss, use your location");
+      navigator.geolocation.getCurrentPosition(successForCurrentWeather, fail);
+      function successForCurrentWeather(position){
+        locationLat = position.coords.latitude;
+        locationLon = position.coords.longitude;
+        var currentWeatherQueryData = new LatLonQueryData(locationLat, locationLon);
+        $.ajax({
+          'url':urlForCurrentWeather,
+          'type':'GET',
+          'data':currentWeatherQueryData,
+          'success': showCurrentWeatherOnThePage,
+          'error': ajaxFailed
+        }); 
+      }
+    }
+    else{
+      $.ajax({
+      'url':urlForCurrentWeather,
+      'type':'GET',
+      'data':queryData,
+      'success': showCurrentWeatherOnThePage,
+      'error': ajaxFailed
+    }); 
+    }
+    //alert("get data success:"+JSON.stringify(queryData));
+
+  }
+  
+  //when show current weather, change the vale of lat and lon for map;
+  var myCity;
+  var main;
+  var temp;
+  var windSpeed;
+  var pressure;
+  var humidity;
+  var temp_min;
+  var temp_max;
+  var sunRise;
+  var sunSet;
+  function showCurrentWeatherOnThePage(data){
+    $("li").remove();
+      yourLat = data.coord.lat;
+      yourLon = data.coord.lon;
+
+      main = data.weather[0].main;
+      myCity = data.name;
+      temp = data.main.temp+"Kelvin";
+      windSpeed = data.wind.speed+"meter/sec";
+      pressure = data.main.pressure+"hPa";
+      humidity = data.main.humidity+"%";
+      temp_min = data.main.temp_min+"Kelvin";
+      temp_max = data.main.temp_max+"Kelvin";
+      //sunRise = JSON.stringify(new Date(data.sys.sunrise*1000));
+      //sunSet = JSON.stringify(new Date(data.sys.sunset*1000));
+      $('<li>').text("current weather:").appendTo("#currentWeather");
+      $('<li>').text("current city:"+myCity).appendTo("#currentWeather");
+      $('<li>').text(main).appendTo("#currentWeather");
+      $('<li>').text("temperature:"+temp).appendTo("#currentWeather");
+      $('<li>').text("wind speed:"+windSpeed).appendTo("#currentWeather");
+      $('<li>').text("pressure:"+pressure).appendTo("#currentWeather");
+      $('<li>').text("humidity:"+humidity).appendTo("#currentWeather");
+      $('<li>').text("min temperature:"+temp_min).appendTo("#currentWeather");
+      $('<li>').text("max temperature:"+temp_max).appendTo("#currentWeather");
+      //$('<li>').text("sunRise:"+sunRise).appendTo("#currentWeather");
+      //$('<li>').text("sunSet:"+sunSet).appendTo("#currentWeather");
+    }
+    function ajaxFailed(){
+      alert("weather ajax failed");
+    }
+
+  function showWeather5day3hourWeather(){
+    var queryData = setWeatherQueryData();
+    if(queryData===null){
+      navigator.geolocation.getCurrentPosition(successForForeCastWeather, fail);
+      function successForForeCastWeather(position){
+        locationLat = position.coords.latitude;
+        locationLon = position.coords.longitude;
+        var queryData = new LatLonQueryData(locationLat, locationLon);
+        $.ajax({
+          'url':urlForForeCast,
+          'type':'GET',
+          'data':queryData,
+          'success': showForeCastWeatherOnThePage,
+          'error': ajaxFailed
+        }); 
+      }
+      
+    }
+    //alert("get data success:"+JSON.stringify(queryData));
+    //alert(currentUrl);
+    else{
+      $.ajax({
+        'url':urlForForeCast,
+        'type':'GET',
+        'data':queryData,
+        'success': showForeCastWeatherOnThePage,
+        'error': ajaxFailed
+      });
+    }
+    
+  }
+  var foreCastData;
+  function showForeCastWeatherOnThePage(data){
+    foreCastData = data;
+    $("option").remove();
+    $('<option>').text("(choose an forecase)").appendTo("select");
+    var foreCastList = data.list;
+    for(var i=0; i<foreCastList.length; i++){
+      $('<option>').text(foreCastList[i].dt_txt).appendTo("select");
+    }
+  }
+  function changeTimeForForeCast(){
+    $('#forecastoutput').val("");
+    $('#ForeCastWeather').change(function() {
+      $('#forecastoutput').val("");
+		var choosedTime = $('#ForeCastWeather').val();
+    var foreCastResult;
+    myCity = foreCastData.city.name;
+    foreCastResult = myCity + "\n";
+    for(var i=0; i<foreCastData.list.length; i++){
+      if(choosedTime == foreCastData.list[i].dt_txt){
+        main = foreCastData.list[i].weather[0].main;
+        temp = foreCastData.list[i].main.temp;
+        windSpeed = foreCastData.list[i].wind.speed;
+        pressure = foreCastData.list[i].main.pressure;
+        humidity = foreCastData.list[i].main.humidity;
+        temp_min = foreCastData.list[i].main.temp_min;
+        temp_max = foreCastData.list[i].main.temp_max;
+
+        break;
+      }
+    }
+    foreCastResult += main  + "\n";
+    foreCastResult += "temperature:" + temp + "\n";
+    foreCastResult += "windSpeed:" + windSpeed + "\n";
+    foreCastResult += "pressure:" + pressure + "\n";
+    foreCastResult += "humidity:" + humidity + "\n";
+    foreCastResult += "min temperature:" + temp_min + "\n";
+    foreCastResult += "max temperature:" + temp_max + "\n";
+		$('#forecastoutput').val(foreCastResult);
+	});
+  }
+  
+  
+  function setParameter(key, value){
+    var newUrl = window.location.href;
+    if (newUrl.indexOf('?') > -1){
+      var parts = newUrl.split('?');
+      newUrl = parts[0];
+    }
+    
+    newUrl += '?'+key+'='+value;
+    window.location.href = newUrl;
+  }
+
+  function searchWeather(){
+    $("#searchWeather").click(function(){
+      var theZipCode = $("#zipCode").val();
+      var theCity = $("#inputCity").val();
+      if(theZipCode != null && theZipCode != ''){
+        setParameter("zip", theZipCode);
+        return;
+      }
+      if(theCity != null && theCity != ''){
+        setParameter("city", theCity);
+        return;
+      }
+    });    
+  }
+  //show weather data, when the page onload
+  //when the page on load, set the lat and lon variable
+  $(document).ready(
+    function(){
+      showCurrentWeather();
+      showWeather5day3hourWeather();
+      changeTimeForForeCast();
+      searchWeather();
+    }
+  );
+</script>
+</head>
+<body>
+
+<div id="map-canvas"></div>
+<div id="currentWeather"></div>
+    <div>
+			<select id="ForeCastWeather">
+				
+			</select>
+		</div>
+
+		<div>
+			<textarea id="forecastoutput" rows="10" cols="50"></textarea>
+		</div>
+    <input type="text" id="zipCode"/>Zip Code<br />
+    <input type="text" id="inputCity"/>City<br />
+    <input type="submit" id="searchWeather" value="Search Weather" /><br />
+</body>
+</html>

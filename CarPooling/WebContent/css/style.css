@@ -1,0 +1,18 @@
+.modal-body{
+	border:1px solid transparent;
+	background-color: #009b9b;
+	margin-top: 40px;
+}
+.col-md-9 input[type=text]{
+	width:200px;
+}
+.panel-info{
+	background-color: #eee;
+}
+.login-box{
+	background-color: #eee;
+}
+label.error{
+	color:red;
+	margin-left:5px;
+}
